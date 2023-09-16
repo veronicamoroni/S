@@ -1,36 +1,47 @@
 import threading
+import random
+import time
 
-class Monitor:
+# Definimos un monitor para el cruce de carreteras
+class IntersectionMonitor:
     def __init__(self):
-        self.semaphore = threading.Semaphore(0)
-        self.mutex = threading.Lock()
-        self.data = None
+        self.semaphore = threading.Semaphore(1)  # Semáforo para controlar el acceso a la intersección
 
-    def set_data(self, value):
-        with self.mutex:
-            self.data = value
-            self.semaphore.release()
-
-    def get_data(self):
+    def enter_intersection(self, car_id):
+        print(f'Car {car_id} is requesting entry to the intersection')
         self.semaphore.acquire()
-        with self.mutex:
-            return self.data
+        print(f'Car {car_id} entered the intersection')
 
-monitor = Monitor()
+    def exit_intersection(self, car_id):
+        print(f'Car {car_id} is exiting the intersection')
+        self.semaphore.release()
+        print(f'Car {car_id} exited the intersection')
 
-def producer():
-    data = "Hola bienvenidos a Sistemas Operativos!"
-    monitor.set_data(data)
+# Función que simula el movimiento de un coche a través de la intersección
+def car_thread(car_id, intersection):
+    while True:
+        # Espera aleatoria antes de llegar a la intersección
+        time.sleep(random.uniform(0, 2))
+        
+        intersection.enter_intersection(car_id)
+        
+        # Simula el tiempo que pasa en la intersección
+        time.sleep(random.uniform(1, 3))
+        
+        intersection.exit_intersection(car_id)
 
-def consumer():
-    data = monitor.get_data()
-    print(data)
-
-producer_thread = threading.Thread(target=producer)
-consumer_thread = threading.Thread(target=consumer)
-
-producer_thread.start()
-consumer_thread.start()
-
-producer_thread.join()
-consumer_thread.join()
+if __name__ == '__main__':
+    intersection = IntersectionMonitor()
+    num_cars = 5
+    
+    # Creamos hilos para representar los coches
+    car_threads = []
+    
+    for i in range(num_cars):
+        car_thread_obj = threading.Thread(target=car_thread, args=(i, intersection))
+        car_threads.append(car_thread_obj)
+        car_thread_obj.start()
+    
+    # Esperamos a que todos los hilos terminen
+    for car_thread_obj in car_threads:
+        car_thread_obj.join()

@@ -1,39 +1,32 @@
 import threading
+import time
 
-class Filosofo(threading.Thread):
-    def __init__(self, nombre, tenedor_izquierdo, tenedor_derecho, semaforo):
-        threading.Thread.__init__(self)
-        self.nombre = nombre
-        self.tenedor_izquierdo = tenedor_izquierdo
-        self.tenedor_derecho = tenedor_derecho
-        self.semaforo = semaforo
+num_filosofos = 5
+tenedores = [threading.Semaphore(1) for i in range(num_filosofos)]
+mutex = threading.Semaphore(1)
 
-    def run(self):
-        while True:
-            # Filósofo piensa
-            print(f'{self.nombre} está pensando.')
+def filosofo(filosofo_id):
+    while True:
+        print(f"Filósofo {filosofo_id} está pensando.")
+        time.sleep(2)
+        
+        mutex.acquire()
+        tenedores[filosofo_id].acquire()
+        tenedores[(filosofo_id + 1) % num_filosofos].acquire()
+        mutex.release()
+        
+        print(f"Filósofo {filosofo_id} está comiendo.")
+        time.sleep(2)
+        
+        tenedores[filosofo_id].release()
+        tenedores[(filosofo_id + 1) % num_filosofos].release()
 
-            # Filósofo tiene hambre
-            self.comer()
+# Crear hilos para cada filósofo
+for i in range(num_filosofos):
+    t = threading.Thread(target=filosofo, args=(i,))
+    t.start()
 
-    def comer(self):
-        with self.semaforo:
-            # Obtener tenedores
-            self.tenedor_izquierdo.acquire()
-            self.tenedor_derecho.acquire()
-
-            # Filósofo come
-            print(f'{self.nombre} está comiendo.')
-
-            # Liberar los tenedores después de comer
-            self.tenedor_izquierdo.release()
-            self.tenedor_derecho.release()
-
-tenedores = [threading.Semaphore(1) for _ in range(5)]  # Crear una lista de semáforos para los tenedores
-semaforo = threading.Semaphore(4)  # Crear un semáforo para controlar el acceso a la mesa
-
-filosofos = []
-for i in range(5):
-    filosofo = Filosofo(f'Filósofo {i+1}', tenedores[i], tenedores[(i+1)%5], semaforo)  # Asignar tenedores y semáforo a los filósofos
-    filosofos.append(filosofo)
-    filosofo.start()  # Iniciar el hilo de cada filósofo
+# Esperar a que todos los hilos terminen
+for thread in threading.enumerate():
+    if thread != threading.current_thread():
+        thread.join()

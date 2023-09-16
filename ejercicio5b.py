@@ -1,45 +1,55 @@
+
 import threading
+import time
 
+database_semaphore = threading.Semaphore(1)
+readers_semaphore = threading.Semaphore(0)
+writers_semaphore = threading.Semaphore(0)
 
-mutex = threading.Semaphore(1)  # Controla el acceso a la base de datos
-db_access = threading.Semaphore(1)  # Controla el acceso a la variable compartida num_reads
+active_readers = 0
 
-# Variable compartida
-num_reads = 0
+def reader(reader_id):
+    global active_readers
+    print(f'Lector {reader_id} quiere leer.')
+    
+    writers_semaphore.acquire()
+    
+    active_readers += 1
+    if active_readers == 1:
+        database_semaphore.acquire()
+    
+    writers_semaphore.release()
+    readers_semaphore.release()
+    
+    print(f'Lector {reader_id} está leyendo.')
+    time.sleep(2)
+    
+    readers_semaphore.acquire()
+    active_readers -= 1
+    if active_readers == 0:
+        database_semaphore.release()
+    readers_semaphore.release()
+    
+    print(f'Lector {reader_id} ha terminado de leer.')
 
-def lector(id):
-    global num_reads
-    while True:
-        mutex.acquire()
-        num_reads += 1
-        if num_reads == 1:
-            db_access.acquire()
-        mutex.release()
+def writer(writer_id):
+    print(f'Escritor {writer_id} quiere escribir.')
+    
+    database_semaphore.acquire()
+    
+    print(f'Escritor {writer_id} está escribiendo.')
+    time.sleep(3)
+    
+    database_semaphore.release()
+    print(f'Escritor {writer_id} ha terminado de escribir.')
 
-        # Leer la base de datos
-        print(f'Lector {id} está leyendo la base de datos')
+reader_threads = [threading.Thread(target=reader, args=(i,)) for i in range(3)]
+writer_threads = [threading.Thread(target=writer, args=(i,)) for i in range(2)]
 
-        mutex.acquire()
-        num_reads -= 1
-        if num_reads == 0:
-            db_access.release()
-        mutex.release()
+for thread in reader_threads + writer_threads:
+    thread.start()
 
-def escritor(id):
-    while True:
-        db_access.acquire()
+for thread in reader_threads + writer_threads:
+    thread.join()
 
-        # Escribir en la base de datos
-        print(f'Escritor {id} está escribiendo en la base de datos')
-
-        db_access.release()
-
-# Crear lectores y escritores
-num_lectores = 3
-num_escritores = 2
-
-for i in range(num_lectores):
-    threading.Thread(target=lector, args=(i,)).start()
-
-for i in range(num_escritores):
-    threading.Thread(target=escritor, args=(i,)).start()
+    print('Todos los lectores y escritores han terminado.')
